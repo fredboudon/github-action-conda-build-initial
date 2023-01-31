@@ -8,7 +8,7 @@ on:
         required: true      
 
 env:
-  BUILD_CMD_PREFIX: "conda build . --no-test --python="
+  BUILD_CMD_PREFIX: "conda build . --no-test --python=3."
 
 
 jobs:
@@ -17,12 +17,7 @@ jobs:
     strategy:
       matrix:
         os: [ macos-latest, ubuntu-latest]
-        env:
-          - CONDA_PY: "3.8" 
-          - CONDA_PY: "3.9" 
-          - CONDA_PY: "3.10" 
-
-    environment: anaconda_build
+        python-minor-version: [8, 9, 10, 11]
 
     steps:
     - name: Checkout sources
@@ -51,22 +46,16 @@ jobs:
       id: build
       shell: bash -l {0}
       env:
-          CONDA_PY: ${{ matrix.env.CONDA_PY }}
-          BUILD_CMD: "${{ env.BUILD_CMD_PREFIX }}${{ matrix.env.CONDA_PY }}"
+          BUILD_CMD: "${{ env.BUILD_CMD_PREFIX }}${{ matrix.python-minor-version }}"
       run: |
         # Build
-        if [[ "$CONDA_PY" = "" ]]; then
-          echo "CONDA_PY is not defined"
-          exit -1
-        fi
-
         $BUILD_CMD
 
 
     - name: Deploy
       shell: bash -l {0}
       env:
-          BUILD_OUTPUT_CMD: "${{ env.BUILD_CMD_PREFIX }}${{ matrix.env.CONDA_PY }} --output"
+          BUILD_OUTPUT_CMD: "${{ env.BUILD_CMD_PREFIX }}${{ matrix.python-minor-version }} --output"
       run: |
 
         export PACKAGE_NAME=`$BUILD_OUTPUT_CMD`
@@ -83,12 +72,7 @@ jobs:
     strategy:
       matrix:
         os: [ windows-2019]
-        env:
-          - CONDA_PY: "3.8" 
-          - CONDA_PY: "3.9" 
-          - CONDA_PY: "3.10" 
-
-    environment: anaconda_build
+        python-minor-version: [8, 9, 10, 11]
 
     steps:
     - name: Checkout sources
@@ -120,11 +104,10 @@ jobs:
     - name: Build
       id: build
       env:
-          CONDA_PY: ${{ matrix.env.CONDA_PY }}
-          BUILD_CMD: "${{ env.BUILD_CMD_PREFIX }}${{ matrix.env.CONDA_PY }}"
+          BUILD_CMD: "${{ env.BUILD_CMD_PREFIX }}${{ matrix.python-minor-version }}"
       shell: cmd /C CALL {0} 
       run: |
-        ECHO Conda build with CMD and Python %CONDA_PY%
+        ECHO Conda build with CMD 
         call conda activate base
 
         ECHO BUILD
@@ -133,7 +116,7 @@ jobs:
 
     - name: Deploy
       env:
-          BUILD_OUTPUT_CMD: "${{ env.BUILD_CMD_PREFIX }}${{ matrix.env.CONDA_PY }} --output"
+          BUILD_OUTPUT_CMD: "${{ env.BUILD_CMD_PREFIX }}${{ matrix.python-minor-version }} --output"
       shell: cmd /C CALL {0}
       run: |
 
