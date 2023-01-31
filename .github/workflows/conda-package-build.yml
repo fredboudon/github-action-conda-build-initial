@@ -2,9 +2,10 @@ name: Building Package using Conda
 
 on:
   workflow_call:
-    secrets:
+    inputs:
       token:
-        required: true
+        description: 'Anaconda access Token (required)'
+        required: true      
 
 env:
   BUILD_CMD_PREFIX: "conda build . --no-test --python="
@@ -61,42 +62,12 @@ jobs:
 
         $BUILD_CMD
 
-    - name: Set UUID
-      id: generate-uuid
-      uses: filipstefansson/uuid-action@v1.1
-
-    - name: Login
-      shell: bash -l {0}
-      env:
-          ANACONDA_LOGIN: ${{ secrets.ANACONDA_LOGIN }}
-          ANACONDA_PASSWORD: ${{ secrets.ANACONDA_PASSWORD }}
-          SESSION_UID: ${{ steps.generate-uuid.outputs.uuid }}
-      run: |
-        # Login
-        if [[ "$ANACONDA_LOGIN" = "" ]]; then
-          echo "ANACONDA_LOGIN is not defined"
-          exit -1
-        fi
-        if [[ "$SESSION_UID" = "" ]]; then
-          echo "SESSION_UID is not defined"
-          exit -1
-        fi
-
-        echo "SESSION_UID=$SESSION_UID"
-
-        anaconda login --username $ANACONDA_LOGIN --password $ANACONDA_PASSWORD --hostname $SESSION_UID
 
     - name: Deploy
       shell: bash -l {0}
       env:
-          ANACONDA_OWNER: ${{ secrets.ANACONDA_OWNER }}
           BUILD_OUTPUT_CMD: "${{ env.BUILD_CMD_PREFIX }}${{ matrix.env.CONDA_PY }} --output"
       run: |
-        # Deploy
-        if [[ "$ANACONDA_OWNER" = "" ]]; then
-          echo "ANACONDA_OWNER is not defined"
-          exit -1
-        fi
 
         export PACKAGE_NAME=`$BUILD_OUTPUT_CMD`
 
@@ -104,8 +75,8 @@ jobs:
           echo "PACKAGE_NAME is not defined"
           exit -1
         fi
-
-        anaconda upload --skip-existing $PACKAGE_NAME -u $ANACONDA_OWNER --no-progress
+        export ANACONDA_API_TOKEN=${{ inputs.token }}
+        anaconda upload --skip-existing $PACKAGE_NAME --no-progress
 
   build-win:
     runs-on: ${{ matrix.os }}
@@ -160,42 +131,11 @@ jobs:
         ECHO BUILD_CMD="%BUILD_CMD%"
         %BUILD_CMD%
 
-    - name: Set UUID
-      id: generate-uuid
-      uses: filipstefansson/uuid-action@v1.1
-
-    - name: Login
-      env:
-          ANACONDA_LOGIN: ${{ secrets.ANACONDA_LOGIN }}
-          ANACONDA_PASSWORD: ${{ secrets.ANACONDA_PASSWORD }}
-          SESSION_UID: ${{ steps.generate-uuid.outputs.uuid }}
-      shell: cmd /C CALL {0}
-      run: |
-        IF not defined ANACONDA_LOGIN (
-          echo "ANACONDA_LOGIN is not defined"
-          exit -1
-        )
-        IF not defined SESSION_UID (
-          echo "SESSION_UID is not defined"
-          exit -1
-        )
-        ECHO SESSION_UID=%SESSION_UID%
-
-        ECHO LOGIN
-        call conda activate base
-        anaconda login --username %ANACONDA_LOGIN% --password %ANACONDA_PASSWORD% --hostname %SESSION_UID%
-
     - name: Deploy
       env:
-          ANACONDA_OWNER: ${{ secrets.ANACONDA_OWNER }}
           BUILD_OUTPUT_CMD: "${{ env.BUILD_CMD_PREFIX }}${{ matrix.env.CONDA_PY }} --output"
-
       shell: cmd /C CALL {0}
       run: |
-        if not defined ANACONDA_OWNER (
-          echo "ANACONDA_OWNER is not defined"
-          exit 1
-        )
 
         call conda activate base
         ECHO Retrieve output
@@ -211,5 +151,6 @@ jobs:
         ECHO PACKAGE_NAME="%PACKAGE_NAME%"
 
         ECHO DEPLOY
-        anaconda upload --skip-existing %PACKAGE_NAME% -u %ANACONDA_OWNER% --no-progress
+        SET ANACONDA_API_TOKEN=${{ inputs.token }}
+        anaconda upload --skip-existing %PACKAGE_NAME% --no-progress
 
