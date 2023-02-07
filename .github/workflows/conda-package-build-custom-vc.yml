@@ -1,0 +1,139 @@
+name: Building Package using Conda
+
+on:
+  workflow_call:
+    secrets:
+      token:
+        description: 'Anaconda access Token (required)'
+        required: true      
+
+env:
+  BUILD_CMD_PREFIX: "conda build . --no-test --python=3."
+
+
+jobs:
+  build-unix:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ macos-latest, ubuntu-latest]
+        python-minor-version: [8, 9, 10, 11]
+
+    steps:
+    - name: Checkout sources
+      uses: actions/checkout@v3
+
+    - name: Setup Miniconda
+      uses: conda-incubator/setup-miniconda@v2.2.0
+      with:
+          miniconda-version: "latest"
+          auto-update-conda: true
+          channels: conda-forge, fredboudon
+          auto-activate-base: true
+          activate-environment: ""
+          conda-build-version: "*"
+          mamba-version: "*"
+
+    - name: Setup anaconda-client
+      shell: bash -l {0}
+      run: |
+        echo "Install anaconda-client"
+        conda info
+        mamba install -y -q anaconda-client
+        anaconda --version
+
+    - name: Build 
+      id: build
+      shell: bash -l {0}
+      env:
+          BUILD_CMD: "${{ env.BUILD_CMD_PREFIX }}${{ matrix.python-minor-version }}"
+      run: |
+        # Build
+        $BUILD_CMD
+
+
+    - name: Deploy
+      shell: bash -l {0}
+      env:
+          BUILD_OUTPUT_CMD: "${{ env.BUILD_CMD_PREFIX }}${{ matrix.python-minor-version }} --output"
+      run: |
+
+        export PACKAGE_NAME=`$BUILD_OUTPUT_CMD`
+
+        if [[ "$PACKAGE_NAME" = "" ]]; then
+          echo "PACKAGE_NAME is not defined"
+          exit -1
+        fi
+        export ANACONDA_API_TOKEN=${{ secrets.token }}
+        anaconda upload --skip-existing $PACKAGE_NAME --no-progress
+
+  build-win:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ windows-2019]
+        python-minor-version: [8, 9, 10, 11]
+
+    steps:
+    - name: Checkout sources
+      uses: actions/checkout@v3
+
+    - name: Setup Miniconda
+      uses: conda-incubator/setup-miniconda@v2.2.0
+      with:
+          miniconda-version: "latest"
+          auto-update-conda: true
+          channels: conda-forge, fredboudon
+          auto-activate-base: true
+          activate-environment: ""
+          conda-build-version: "*"
+          mamba-version: "*"
+
+    - name: Setup anaconda-client
+      shell: cmd /C CALL {0} 
+      run: |
+        ECHO "Install anaconda-client"
+        call conda activate base
+        mamba install -y -q anaconda-client
+
+    - name: Setup Visual Studio
+      uses: ilammy/msvc-dev-cmd@v1
+      with:
+          vsversion: "2019"
+
+    - name: Build
+      id: build
+      env:
+          BUILD_CMD: "${{ env.BUILD_CMD_PREFIX }}${{ matrix.python-minor-version }}"
+      shell: cmd /C CALL {0} 
+      run: |
+        ECHO Conda build with CMD 
+        call conda activate base
+
+        ECHO BUILD
+        ECHO BUILD_CMD="%BUILD_CMD%"
+        %BUILD_CMD%
+
+    - name: Deploy
+      env:
+          BUILD_OUTPUT_CMD: "${{ env.BUILD_CMD_PREFIX }}${{ matrix.python-minor-version }} --output"
+      shell: cmd /C CALL {0}
+      run: |
+
+        call conda activate base
+        ECHO Retrieve output
+
+        FOR /f  %%i IN ('call %BUILD_OUTPUT_CMD%') DO (
+          SET PACKAGE_NAME=%%i
+        )
+
+        IF  not defined PACKAGE_NAME (
+          ECHO "PACKAGE_NAME is not defined"
+          EXIT 1
+        )
+        ECHO PACKAGE_NAME="%PACKAGE_NAME%"
+
+        ECHO DEPLOY
+        SET ANACONDA_API_TOKEN=${{ secrets.token }}
+        anaconda upload --skip-existing %PACKAGE_NAME% --no-progress
+

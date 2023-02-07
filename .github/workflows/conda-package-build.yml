@@ -7,133 +7,71 @@ on:
         description: 'Anaconda access Token (required)'
         required: true      
 
-env:
-  BUILD_CMD_PREFIX: "conda build . --no-test --python=3."
-
-
 jobs:
-  build-unix:
+  build-and-publish:
+    name: ${{ matrix.os }}, Python 3.${{ matrix.python-minor-version }} for conda deployment
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
+      max-parallel: 3
       matrix:
-        os: [ macos-latest, ubuntu-latest]
+        os: [ ubuntu-latest , macos-latest , windows-latest]
         python-minor-version: [8, 9, 10, 11]
+        isMaster:
+          - ${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/dev') }}
+        exclude:
+          - isMaster: false
+            os: ubuntu-latest
+            python-minor-version: 8
+          - isMaster: false
+            os: ubuntu-latest
+            python-minor-version: 9
+          - isMaster: false
+            os: ubuntu-latest
+            python-minor-version: 10
+          - isMaster: false
+            os: macos-latest
+            python-minor-version: 8
+          - isMaster: false
+            os: macos-latest
+            python-minor-version: 9
+          - isMaster: false
+            os: macos-latest
+            python-minor-version: 10
+          - isMaster: false
+            os: macos-latest
+            python-minor-version: 11
+          - isMaster: false
+            os: windows-latest
+            python-minor-version: 8
+          - isMaster: false
+            os: windows-latest
+            python-minor-version: 9
+          - isMaster: false
+            os: windows-latest
+            python-minor-version: 10            
+          - isMaster: false
+            os: windows-latest
+            python-minor-version: 11
 
     steps:
-    - name: Checkout sources
+    - name: Checkout
       uses: actions/checkout@v3
-
-    - name: Setup Miniconda
-      uses: conda-incubator/setup-miniconda@v2.2.0
+    - name: Determine publication
+      uses: haya14busa/action-cond@v1
+      id: publish
       with:
-          miniconda-version: "latest"
-          auto-update-conda: true
-          channels: conda-forge, fredboudon
-          auto-activate-base: true
-          activate-environment: ""
-          conda-build-version: "*"
-          mamba-version: "*"
-
-    - name: Setup anaconda-client
-      shell: bash -l {0}
-      run: |
-        echo "Install anaconda-client"
-        conda info
-        mamba install -y -q anaconda-client
-        anaconda --version
-
-    - name: Build 
-      id: build
-      shell: bash -l {0}
-      env:
-          BUILD_CMD: "${{ env.BUILD_CMD_PREFIX }}${{ matrix.python-minor-version }}"
-      run: |
-        # Build
-        $BUILD_CMD
-
-
-    - name: Deploy
-      shell: bash -l {0}
-      env:
-          BUILD_OUTPUT_CMD: "${{ env.BUILD_CMD_PREFIX }}${{ matrix.python-minor-version }} --output"
-      run: |
-
-        export PACKAGE_NAME=`$BUILD_OUTPUT_CMD`
-
-        if [[ "$PACKAGE_NAME" = "" ]]; then
-          echo "PACKAGE_NAME is not defined"
-          exit -1
-        fi
-        export ANACONDA_API_TOKEN=${{ secrets.token }}
-        anaconda upload --skip-existing $PACKAGE_NAME --no-progress
-
-  build-win:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ windows-2019]
-        python-minor-version: [8, 9, 10, 11]
-
-    steps:
-    - name: Checkout sources
-      uses: actions/checkout@v3
-
-    - name: Setup Miniconda
-      uses: conda-incubator/setup-miniconda@v2.2.0
+        cond: ${{ contains(github.ref, 'stable') || startsWith(github.ref, 'refs/heads/v') }}
+        if_true: 'true'
+        if_false: 'false'
+    - name: Build and Publish
+      uses: openalea/action-build-publish-anaconda@v0.1.4
       with:
-          miniconda-version: "latest"
-          auto-update-conda: true
-          channels: conda-forge, fredboudon
-          auto-activate-base: true
-          activate-environment: ""
-          conda-build-version: "*"
-          mamba-version: "*"
-
-    - name: Setup anaconda-client
-      shell: cmd /C CALL {0} 
-      run: |
-        ECHO "Install anaconda-client"
-        call conda activate base
-        mamba install -y -q anaconda-client
-
-    - name: Setup Visual Studio
-      uses: ilammy/msvc-dev-cmd@v1
-      with:
-          vsversion: "2019"
-
-    - name: Build
-      id: build
-      env:
-          BUILD_CMD: "${{ env.BUILD_CMD_PREFIX }}${{ matrix.python-minor-version }}"
-      shell: cmd /C CALL {0} 
-      run: |
-        ECHO Conda build with CMD 
-        call conda activate base
-
-        ECHO BUILD
-        ECHO BUILD_CMD="%BUILD_CMD%"
-        %BUILD_CMD%
-
-    - name: Deploy
-      env:
-          BUILD_OUTPUT_CMD: "${{ env.BUILD_CMD_PREFIX }}${{ matrix.python-minor-version }} --output"
-      shell: cmd /C CALL {0}
-      run: |
-
-        call conda activate base
-        ECHO Retrieve output
-
-        FOR /f  %%i IN ('call %BUILD_OUTPUT_CMD%') DO (
-          SET PACKAGE_NAME=%%i
-        )
-
-        IF  not defined PACKAGE_NAME (
-          ECHO "PACKAGE_NAME is not defined"
-          EXIT 1
-        )
-        ECHO PACKAGE_NAME="%PACKAGE_NAME%"
-
-        ECHO DEPLOY
-        SET ANACONDA_API_TOKEN=${{ secrets.token }}
-        anaconda upload --skip-existing %PACKAGE_NAME% --no-progress
-
+        conda: conda
+        mamba: true
+        python: ${{ matrix.python-minor-version }}
+        numpy: '22'
+        channels: fredboudon, conda-forge
+        token: ${{ secrets.ANACONDA_TOKEN }}
+        publish: ${{ steps.publish.outputs.value }}
+        label: main
