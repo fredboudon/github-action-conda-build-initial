@@ -13,7 +13,6 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
-      max-parallel: 3
       matrix:
         os: [ ubuntu-latest , macos-latest , windows-latest]
         python-minor-version: [7, 8, 9, 10, 11]
@@ -22,18 +21,18 @@ jobs:
         exclude:
           - isMaster: false
             python-minor-version: 7
-           - isMaster: false
+          - isMaster: false
             python-minor-version: 8
           - isMaster: false
             python-minor-version: 9
           - isMaster: false
-            python-minor-version: 10
+            python-minor-version: 11
           - isMaster: false
             os: macos-latest
-            python-minor-version: 11
+            python-minor-version: 10
           - isMaster: false
             os: windows-latest
-            python-minor-version: 11
+            python-minor-version: 10
 
     steps:
     - name: Checkout
@@ -46,12 +45,12 @@ jobs:
         if_true: 'true'
         if_false: 'false'
     - name: Build and Publish
-      uses: openalea/action-build-publish-anaconda@v0.1.4
+      uses: fredboudon/action-build-publish-anaconda@main
       with:
         conda: conda
         mamba: true
         python: ${{ matrix.python-minor-version }}
-        numpy: '22'
+        numpy: '24'
         channels: fredboudon, conda-forge
         token: ${{ secrets.ANACONDA_TOKEN }}
         publish: ${{ steps.publish.outputs.value }}
