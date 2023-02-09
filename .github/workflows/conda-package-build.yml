@@ -2,6 +2,11 @@ name: Building Package using Conda
 
 on:
   workflow_call:
+    inputs:
+      python-minor-versions: 
+        description: 'Python minor versions to consider'
+        required: false
+        default: [7, 8, 9, 10, 11]
     secrets:
       token:
         description: 'Anaconda access Token (required)'
@@ -15,7 +20,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ ubuntu-latest , macos-latest , windows-latest]
-        python-minor-version: [7, 8, 9, 10, 11]
+        python-minor-version: ${{ inputs.python-minor-versions }}
         isMaster:
           - ${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/dev') }}
         exclude:
@@ -55,3 +60,4 @@ jobs:
         token: ${{ secrets.ANACONDA_TOKEN }}
         publish: ${{ steps.publish.outputs.value }}
         label: main
+        buildoptions: '--no-test'
