@@ -52,7 +52,7 @@ jobs:
         python: ${{ matrix.python-minor-version }}
         numpy: '22'
         channels: fredboudon, conda-forge
-        token: ${{ secrets.ANACONDA_TOKEN }}
+        token: ${{ secrets.token }}
         publish: ${{ steps.publish.outputs.value }}
         label: main
         buildoptions: '--no-test'
