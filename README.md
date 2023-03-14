@@ -8,7 +8,7 @@ A Github workflow to build your software package and publish to an Anaconda repo
 This example builds your application on multiple plateforms, with multiple python versions. This is a template for your `.github/workflow/build_publish_anaconda.yml`.
 
 
-'''yaml
+```yaml
 
 
 name: Building Package
@@ -29,4 +29,4 @@ jobs:
     uses: fredboudon/github-action-conda-build/.github/workflows/conda-package-build.yml@main
     secrets: 
       token: ${{ secrets.ANACONDA_TOKEN }}
-'''
+```
